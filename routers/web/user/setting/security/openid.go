@@ -5,6 +5,7 @@ package security
 
 import (
 	"net/http"
+	"net/url"
 
 	user_model "forgejo.org/models/user"
 	"forgejo.org/modules/auth/openid"
@@ -13,6 +14,8 @@ import (
 	"forgejo.org/modules/web"
 	"forgejo.org/services/context"
 	"forgejo.org/services/forms"
+
+	gouuid "github.com/google/uuid"
 )
 
 // OpenIDPost response for change user's openid
@@ -61,7 +64,15 @@ func OpenIDPost(ctx *context.Context) {
 		}
 	}
 
-	redirectTo := setting.AppURL + "user/settings/security"
+	// Bind the OpenID return URL to this session so a cross-site GET cannot attach an identity.
+	// Backport of https://codeberg.org/forgejo/forgejo/commit/19b9b9d216bbfb501c18514bd1a8c980246ca3f7 (v15.0.9 / v16.0.5).
+	openIDState := gouuid.New().String()
+	if err := ctx.Session.Set("openIDState", openIDState); err != nil {
+		ctx.ServerError("Session.Set", err)
+		return
+	}
+
+	redirectTo := setting.AppURL + "user/settings/security?s=" + url.QueryEscape(openIDState)
 	url, err := openid.RedirectURL(id, redirectTo, setting.AppURL)
 	if err != nil {
 		loadSecurityData(ctx)
@@ -73,10 +84,22 @@ func OpenIDPost(ctx *context.Context) {
 }
 
 func settingsOpenIDVerify(ctx *context.Context) {
-	log.Trace("Incoming call to: " + ctx.Req.URL.String())
+	log.Trace("Incoming call to: %s", ctx.Req.URL.String())
+
+	// The `s` parameter is generated when the user starts the association and must match the session.
+	// An empty or missing value is rejected so a CSRF GET cannot register an OpenID identity.
+	incomingOpenIDState := ctx.FormString("s")
+	expectedOpenIDState, _ := ctx.Session.Get("openIDState").(string)
+	if err := ctx.Session.Delete("openIDState"); err != nil {
+		ctx.ServerError("Session.Delete", err)
+		return
+	} else if incomingOpenIDState == "" || incomingOpenIDState != expectedOpenIDState {
+		ctx.RenderWithErr("Invalid OpenID state parameter", tplSettingsSecurity, &forms.AddOpenIDForm{})
+		return
+	}
 
 	fullURL := setting.AppURL + ctx.Req.URL.String()[1:]
-	log.Trace("Full URL: " + fullURL)
+	log.Trace("Full URL: %q", fullURL)
 
 	id, err := openid.Verify(fullURL)
 	if err != nil {

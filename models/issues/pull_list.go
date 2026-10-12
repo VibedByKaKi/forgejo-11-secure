@@ -99,6 +99,16 @@ func CanMaintainerWriteToBranch(ctx context.Context, p access_model.Permission, 
 
 	for _, pr := range prs {
 		if pr.AllowMaintainerEdit {
+			// A public-only token must not pick up write access via a private head repository.
+			// Backport of the public-only half of https://codeberg.org/forgejo/forgejo/commit/06d641d5b8c8b5670908bb414e22db672a2fb893
+			// (v15.0.8 / v16.0.4). Repo-specific access tokens do not exist on v11.
+			if access_model.IsPublicOnly(ctx) {
+				headVisible, err := access_model.RepoVisibleToPublicOnly(ctx, pr.HeadRepo)
+				if err != nil || !headVisible {
+					continue
+				}
+			}
+
 			// PR Poster must have write access to the head, so that when they turned on "AllowMaintainerEdit" they
 			// delegated that write access to the maintainers of the PR base.  If they don't currently have write
 			// access, they can't delegate that access.
@@ -116,6 +126,12 @@ func CanMaintainerWriteToBranch(ctx context.Context, p access_model.Permission, 
 			if err != nil {
 				log.Error("LoadBaseRepo failed: %s", err)
 				continue
+			}
+			if access_model.IsPublicOnly(ctx) {
+				baseVisible, err := access_model.RepoVisibleToPublicOnly(ctx, pr.BaseRepo)
+				if err != nil || !baseVisible {
+					continue
+				}
 			}
 			prPerm, err := access_model.GetUserRepoPermission(ctx, pr.BaseRepo, user)
 			if err != nil {

@@ -6,6 +6,7 @@ package files
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"forgejo.org/models"
@@ -147,13 +148,29 @@ func ApplyDiffPatch(ctx context.Context, repo *repo_model.Repository, doer *user
 	stdout := &strings.Builder{}
 	stderr := &strings.Builder{}
 
-	cmdApply := git.NewCommand(ctx, "apply", "--index", "--recount", "--cached", "--ignore-whitespace", "--whitespace=fix", "--binary")
+	// git apply --index can write conflict files into the working directory. On a bare
+	// temporary repo that working directory is the repo itself, which a malicious patch
+	// can use to mutate repo config and execute processes (variation of the v15.0.6 hook
+	// bypass, fixed in v15.0.9 / v16.0.5). Run apply in an unrelated temp directory and
+	// disable hooks.
+	// Backports:
+	// https://codeberg.org/forgejo/forgejo/commit/5f7e2e5c003c066a865ea483e42809fa87d85eae
+	// https://codeberg.org/forgejo/forgejo/commit/19b9b9d216bbfb501c18514bd1a8c980246ca3f7
+	applyWorkingDir, err := os.MkdirTemp("", "forgejo-applydiffpatch-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(applyWorkingDir)
+
+	cmdApply := git.NewCommand(ctx, "--git-dir")
+	cmdApply.AddDynamicArguments(t.basePath)
+	cmdApply.AddArguments("-c", "core.hooksPath=/dev/null", "apply", "--index", "--recount", "--cached", "--ignore-whitespace", "--whitespace=fix", "--binary")
 	if git.CheckGitVersionAtLeast("2.32") == nil {
 		cmdApply.AddArguments("-3")
 	}
 
 	if err := cmdApply.Run(&git.RunOpts{
-		Dir:    t.basePath,
+		Dir:    applyWorkingDir,
 		Stdout: stdout,
 		Stderr: stderr,
 		Stdin:  strings.NewReader(opts.Content),

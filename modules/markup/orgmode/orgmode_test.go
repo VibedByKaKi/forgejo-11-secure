@@ -4,6 +4,8 @@
 package markup
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -157,4 +159,19 @@ func HelloWorld() {
 	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;Hello World&#34;</span><span class="p">)</span>
 <span class="p">}</span></code></pre>
 </div>`)
+}
+
+func TestRender_BlocksIncludeFileRead(t *testing.T) {
+	setting.AppURL = AppURL
+	setting.AppSubURL = AppSubURL
+
+	const secret = "SECRET_ORG_INCLUDE_SENTINEL"
+	fileName := filepath.Join(t.TempDir(), "secret.org")
+	require.NoError(t, os.WriteFile(fileName, []byte(secret), 0o644))
+
+	output, err := RenderString(&markup.RenderContext{
+		Ctx: git.DefaultContext,
+	}, `#+INCLUDE: "`+fileName+`" src org`)
+	require.NoError(t, err)
+	assert.NotContains(t, output, secret)
 }

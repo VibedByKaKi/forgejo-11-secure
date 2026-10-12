@@ -376,6 +376,9 @@ func tokenRequiresScopes(requiredScopeCategories ...auth_model.AccessTokenScopeC
 
 		// assign to true so that those searching should only filter public repositories/users/organizations
 		ctx.PublicOnly = publicOnly
+		if publicOnly {
+			ctx.AppendContextValueFunc(access_model.PublicOnlyContextKey, func() any { return true })
+		}
 	}
 }
 

@@ -239,10 +239,12 @@ func GetUserRepoPermission(ctx context.Context, repo *repo_model.Repository, use
 		return perm, err
 	}
 
-	// if user in an owner team
+	// Owner teams keep owner access. Admin teams keep admin access and must not be
+	// promoted to owner (which can transfer the repository).
+	// Backport of https://codeberg.org/forgejo/forgejo/commit/450597142beff3af7d571b778738542cac2cfcd7 (v15.0.8).
 	for _, team := range teams {
 		if team.AccessMode >= perm_model.AccessModeAdmin {
-			perm.AccessMode = perm_model.AccessModeOwner
+			perm.AccessMode = team.AccessMode
 			perm.UnitsMode = nil
 			return perm, nil
 		}

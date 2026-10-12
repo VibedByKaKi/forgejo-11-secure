@@ -37,6 +37,14 @@ func checkReleaseMatchRepo(ctx *context.APIContext, releaseID int64) bool {
 		ctx.NotFound()
 		return false
 	}
+	// Draft releases and their attachments must not be visible without write
+	// permission on the releases unit. GetRelease and ListReleaseAttachments
+	// already enforced this (v11.0.x 2026-06-10 patches); attachment fetch did not.
+	// Backport of https://codeberg.org/forgejo/forgejo/commit/106b85d25a46023a305cb1375d2aa0e0b46b2629 (v15.0.8).
+	if release.IsDraft && !ctx.Repo.CanWrite(unit_model.TypeReleases) {
+		ctx.NotFound()
+		return false
+	}
 	return true
 }
 

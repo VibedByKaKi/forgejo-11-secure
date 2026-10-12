@@ -1,0 +1,99 @@
+# Build the linux-amd64 Forgejo binary with the frontend embedded and publish it
+# on a GitHub release. Asset name matches upstream: forgejo-<version>-linux-amd64
+# (version has no leading "v"). See Makefile targets `frontend` and `backend`,
+# and the Dockerfile TAGS (bindata timetzdata sqlite sqlite_unlock_notify).
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build and publish, including the leading v (for example v11.0.16-secure.1)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  linux-amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${{ github.ref_name }}"
+          fi
+          if [ -z "$tag" ]; then
+            echo "A release tag is required. Push a v* tag, or dispatch this workflow with the tag input."
+            exit 1
+          fi
+          tag="${tag#refs/tags/}"
+          version="${tag#v}"
+          if [ -z "$version" ] || [ "$version" = "$tag" ]; then
+            echo "Tag must start with v (got: $tag)"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Resolved $tag -> forgejo-${version}-linux-amd64"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.7"
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential gcc make git
+
+      - name: Build frontend and embedded backend
+        env:
+          GOTOOLCHAIN: go1.26.7
+          CGO_ENABLED: "1"
+          TAGS: bindata timetzdata sqlite sqlite_unlock_notify
+          FORGEJO_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          make frontend
+          make go-check generate-backend backend
+          test -x gitea
+          ./gitea --version
+          # bindata embeds public/; the binary must still answer without that tree.
+          mv public public.embedded-check
+          ./gitea --version
+          mv public.embedded-check public
+          mv gitea "forgejo-${{ steps.version.outputs.version }}-linux-amd64"
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          files: forgejo-${{ steps.version.outputs.version }}-linux-amd64
+          fail_on_unmatched_files: true
+          generate_release_notes: false
+          body: |
+            Security backport of Forgejo v11.0.16.
+            See BACKPORTS.md for the upstream releases included in this build.

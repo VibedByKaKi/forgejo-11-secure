@@ -25,11 +25,18 @@ type HostMatchList struct {
 // MatchBuiltinExternal A valid non-private unicast IP, all hosts on public internet are matched
 const MatchBuiltinExternal = "external"
 
-// MatchBuiltinPrivate RFC 1918 (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) and RFC 4193 (FC00::/7). Also called LAN/Intranet.
+// MatchBuiltinPrivate RFC 1918 (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), RFC 4193 (FC00::/7), and RFC 6598 (100.64.0.0/10). Also called LAN/Intranet.
 const MatchBuiltinPrivate = "private"
 
 // MatchBuiltinLoopback 127.0.0.0/8 for IPv4 and ::1/128 for IPv6, localhost is included.
 const MatchBuiltinLoopback = "loopback"
+
+// Carrier-grade NAT space from RFC 6598, 100.64.0.0/10.
+// Backport of https://codeberg.org/forgejo/forgejo/commit/24c2be351abf929e3ede80f696277a5153b4e996 (v15.0.6 / v16.0.2).
+var cgNAT = net.IPNet{
+	IP:   net.IPv4(100, 64, 0, 0),
+	Mask: net.IPv4Mask(255, 192, 0, 0),
+}
 
 func isBuiltin(s string) bool {
 	return s == MatchBuiltinExternal || s == MatchBuiltinPrivate || s == MatchBuiltinLoopback
@@ -106,11 +113,11 @@ func (hl *HostMatchList) checkIP(ip net.IP) bool {
 	for _, builtin := range hl.builtins {
 		switch builtin {
 		case MatchBuiltinExternal:
-			if ip.IsGlobalUnicast() && !ip.IsPrivate() {
+			if ip.IsGlobalUnicast() && !isPrivate(ip) {
 				return true
 			}
 		case MatchBuiltinPrivate:
-			if ip.IsPrivate() {
+			if isPrivate(ip) {
 				return true
 			}
 		case MatchBuiltinLoopback:
@@ -125,6 +132,10 @@ func (hl *HostMatchList) checkIP(ip net.IP) bool {
 		}
 	}
 	return false
+}
+
+func isPrivate(ip net.IP) bool {
+	return ip != nil && (ip.IsPrivate() || cgNAT.Contains(ip))
 }
 
 // MatchHostName checks if the host matches an allow/deny(block) list

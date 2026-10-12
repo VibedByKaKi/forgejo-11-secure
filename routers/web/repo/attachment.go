@@ -10,6 +10,7 @@ import (
 	"forgejo.org/models/auth"
 	access_model "forgejo.org/models/perm/access"
 	repo_model "forgejo.org/models/repo"
+	"forgejo.org/models/unit"
 	"forgejo.org/modules/httpcache"
 	"forgejo.org/modules/log"
 	"forgejo.org/modules/setting"
@@ -145,6 +146,21 @@ func ServeAttachment(ctx *context.Context, uuid string) {
 		if !perm.CanRead(unitType) {
 			ctx.Error(http.StatusNotFound)
 			return
+		}
+
+		// Attachments of draft releases must not be accessible without write
+		// permission on the releases unit.
+		// Backport of https://codeberg.org/forgejo/forgejo/commit/106b85d25a46023a305cb1375d2aa0e0b46b2629 (v15.0.8).
+		if attach.ReleaseID != 0 {
+			rel, err := repo_model.GetReleaseByID(ctx, attach.ReleaseID)
+			if err != nil {
+				ctx.ServerError("GetReleaseByID", err)
+				return
+			}
+			if rel.IsDraft && !perm.CanWrite(unit.TypeReleases) {
+				ctx.Error(http.StatusNotFound)
+				return
+			}
 		}
 	}
 

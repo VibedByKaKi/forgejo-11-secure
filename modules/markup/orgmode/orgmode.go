@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"html"
 	"io"
+	golog "log"
 	"strings"
+	"sync"
 
 	"forgejo.org/modules/highlight"
 	"forgejo.org/modules/log"
@@ -46,6 +48,17 @@ func (Renderer) Extensions() []string {
 func (Renderer) SanitizerRules() []setting.MarkupSanitizerRule {
 	return []setting.MarkupSanitizerRule{}
 }
+
+// orgConf disables filesystem access. go-org's default configuration reads included files from the server.
+// Backport of https://codeberg.org/forgejo/forgejo/commit/0c41d710877c10a736a83fbf773ac4a44b8fc4ac (v15.0.6 / v16.0.2).
+var orgConf = sync.OnceValue(func() *org.Configuration {
+	conf := org.New()
+	conf.Log = golog.New(io.Discard, "", 0)
+	conf.ReadFile = func(string) ([]byte, error) {
+		return nil, nil
+	}
+	return conf
+})
 
 // Render renders orgmode rawbytes to HTML
 func Render(ctx *markup.RenderContext, input io.Reader, output io.Writer) error {
@@ -105,7 +118,7 @@ func Render(ctx *markup.RenderContext, input io.Reader, output io.Writer) error 
 
 	htmlWriter.ExtendingWriter = w
 
-	res, err := org.New().Silent().Parse(input, "").Write(w)
+	res, err := orgConf().Parse(input, "").Write(w)
 	if err != nil {
 		return fmt.Errorf("orgmode.Render failed: %w", err)
 	}

@@ -265,11 +265,19 @@ type PushOptions struct {
 	Env            []string
 	Timeout        time.Duration
 	PrivateKeyPath string
+	// DisableHooks skips local hooks. Used when applying a diff patch so a malicious patch cannot run hooks.
+	// Backport of https://codeberg.org/forgejo/forgejo/commit/5f7e2e5c003c066a865ea483e42809fa87d85eae (v15.0.6).
+	DisableHooks bool
 }
 
 // Push pushs local commits to given remote branch.
 func Push(ctx context.Context, repoPath string, opts PushOptions) error {
-	cmd := NewCommand(ctx, "push")
+	var cmd *Command
+	if opts.DisableHooks {
+		cmd = NewCommand(ctx, "-c", "core.hooksPath=/dev/null", "push")
+	} else {
+		cmd = NewCommand(ctx, "push")
+	}
 
 	if opts.PrivateKeyPath != "" {
 		// Preserve the behavior that existing environments are used if no

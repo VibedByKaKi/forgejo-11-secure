@@ -99,8 +99,10 @@ func (opts FindCollaborationOptions) ToConds() builder.Cond {
 
 // ChangeCollaborationAccessMode sets new access mode for the collaboration.
 func ChangeCollaborationAccessMode(ctx context.Context, repo *Repository, uid int64, mode perm.AccessMode) error {
-	// Discard invalid input
-	if mode <= perm.AccessModeNone || mode > perm.AccessModeOwner {
+	// Discard invalid input. A collaborator must not be able to become owner via
+	// collaboration; admin is the highest mode this path may set.
+	// Backport of https://codeberg.org/forgejo/forgejo/commit/d4de9eb2a87c26b402fdd0259e079957f8cd2b4b (v15.0.7 / v16.0.3).
+	if mode <= perm.AccessModeNone || mode >= perm.AccessModeOwner {
 		return nil
 	}
 

@@ -85,6 +85,12 @@ func TestHostOrIPMatchesList(t *testing.T) {
 		{"", net.ParseIP("fd00::1"), true},
 		{"", net.ParseIP("1000::1"), false},
 
+		// CGNAT start, end, and just past boundaries on both sides
+		{"", net.ParseIP("100.63.255.255"), false},
+		{"", net.ParseIP("100.64.0.0"), true},
+		{"", net.ParseIP("100.127.255.255"), true},
+		{"", net.ParseIP("100.128.0.0"), false},
+
 		{"mydomain.com", net.IPv4zero, false},
 	}
 	test(cases)
@@ -100,6 +106,12 @@ func TestHostOrIPMatchesList(t *testing.T) {
 		{"", net.ParseIP("::1"), false},
 		{"", net.ParseIP("fd00::1"), false},
 		{"", net.ParseIP("1000::1"), true},
+
+		// CGNAT start, end, and just past boundaries on both sides
+		{"", net.ParseIP("100.63.255.255"), true},
+		{"", net.ParseIP("100.64.0.0"), false},
+		{"", net.ParseIP("100.127.255.255"), false},
+		{"", net.ParseIP("100.128.0.0"), true},
 
 		{"mydomain.com", net.IPv4zero, false},
 	}

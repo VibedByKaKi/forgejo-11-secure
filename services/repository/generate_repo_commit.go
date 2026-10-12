@@ -120,6 +120,13 @@ func generateRepoCommit(ctx context.Context, repo, templateRepo, generateRepo *r
 		}
 	}
 
+	// .git was removed before template expansion. Remove it again in case expansion
+	// recreated it, which git would then adopt during init (arbitrary file read / RCE).
+	// Backport of https://codeberg.org/forgejo/forgejo/commit/06d641d5b8c8b5670908bb414e22db672a2fb893 (v15.0.8 / v16.0.4).
+	if err := util.RemoveAll(path.Join(tmpDir, ".git")); err != nil {
+		return fmt.Errorf("unable to remove .git folder: %w", err)
+	}
+
 	if err := git.InitRepository(ctx, tmpDir, false, templateRepo.ObjectFormatName); err != nil {
 		return err
 	}

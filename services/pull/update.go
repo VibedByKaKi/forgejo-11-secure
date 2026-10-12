@@ -91,6 +91,26 @@ func IsUserAllowedToUpdate(ctx context.Context, pull *issues_model.PullRequest, 
 	if user == nil {
 		return false, false, nil
 	}
+	// Public-only API tokens must not update a pull request using permissions on a private repository.
+	// Backport of the public-only half of https://codeberg.org/forgejo/forgejo/commit/d4de9eb2a87c26b402fdd0259e079957f8cd2b4b
+	// (v15.0.7 / v16.0.3). The authorization reducer and repo-specific tokens are not in v11.
+	if access_model.IsPublicOnly(ctx) {
+		if err := pull.LoadHeadRepo(ctx); err != nil {
+			return false, false, err
+		}
+		if err := pull.LoadBaseRepo(ctx); err != nil {
+			return false, false, err
+		}
+		for _, repo := range []*repo_model.Repository{pull.HeadRepo, pull.BaseRepo} {
+			visible, err := access_model.RepoVisibleToPublicOnly(ctx, repo)
+			if err != nil {
+				return false, false, err
+			}
+			if !visible {
+				return false, false, nil
+			}
+		}
+	}
 	headRepoPerm, err := access_model.GetUserRepoPermission(ctx, pull.HeadRepo, user)
 	if err != nil {
 		if repo_model.IsErrUnitTypeNotExist(err) {
