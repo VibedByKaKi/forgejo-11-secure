@@ -189,9 +189,28 @@ func notify(ctx context.Context, input *notifyInput) error {
 		return nil
 	}
 
+	// Fork pull_request_review and pull_request_review_comment events must
+	// load workflow files from the base branch. The review commit is the
+	// pull request head, which a fork can rewrite. v15 decides this in
+	// getPullRequestCommitAndApproval; v11 has no ActionUser trust table,
+	// so write permission on the actions unit is the trust signal.
+	detectCommit := commit
+	useBase, err := forkReviewWorkflowsFromBase(ctx, input)
+	if err != nil {
+		return err
+	}
+	if useBase {
+		baseRef := git.BranchPrefix + input.PullRequest.BaseBranch
+		baseCommit, err := gitRepo.GetCommit(baseRef)
+		if err != nil {
+			return fmt.Errorf("gitRepo.GetCommit: %w", err)
+		}
+		detectCommit = baseCommit
+	}
+
 	var detectedWorkflows []*actions_module.DetectedWorkflow
 	actionsConfig := input.Repo.MustGetUnit(ctx, unit_model.TypeActions).ActionsConfig()
-	workflows, schedules, err := actions_module.DetectWorkflows(gitRepo, commit,
+	workflows, schedules, err := actions_module.DetectWorkflows(gitRepo, detectCommit,
 		input.Event,
 		input.Payload,
 		shouldDetectSchedules,
@@ -254,6 +273,53 @@ func notify(ctx context.Context, input *notifyInput) error {
 	}
 
 	return handleWorkflows(ctx, detectedWorkflows, commit, input, ref.String())
+}
+
+func isPullRequestReviewEvent(event webhook_module.HookEventType) bool {
+	switch event {
+	case webhook_module.HookEventPullRequestReviewApproved,
+		webhook_module.HookEventPullRequestReviewComment,
+		webhook_module.HookEventPullRequestReviewRejected:
+		return true
+	default:
+		return false
+	}
+}
+
+// forkReviewWorkflowsFromBase reports whether a fork pull request review
+// should execute workflows found on the base branch.
+//
+// A reviewer who can write actions would otherwise skip approval, and the
+// workflow file would be taken from the head commit. That is the fork's
+// tree. Workflows stay on the head when the pull request is not from a
+// fork, the event is not a review, or the poster can already write actions.
+func forkReviewWorkflowsFromBase(ctx context.Context, input *notifyInput) (bool, error) {
+	pr := input.PullRequest
+	if pr == nil || !pr.IsFromFork() || !isPullRequestReviewEvent(input.Event) {
+		return false, nil
+	}
+
+	if err := pr.LoadIssue(ctx); err != nil {
+		return false, err
+	}
+	if err := pr.Issue.LoadPoster(ctx); err != nil {
+		return false, err
+	}
+	if pr.Issue.Poster != nil {
+		posterPerm, err := access_model.GetUserRepoPermission(ctx, input.Repo, pr.Issue.Poster)
+		if err != nil {
+			return false, fmt.Errorf("GetUserRepoPermission: %w", err)
+		}
+		if posterPerm.CanWrite(unit_model.TypeActions) {
+			return false, nil
+		}
+	}
+
+	doerPerm, err := access_model.GetUserRepoPermission(ctx, input.Repo, input.Doer)
+	if err != nil {
+		return false, fmt.Errorf("GetUserRepoPermission: %w", err)
+	}
+	return doerPerm.CanWrite(unit_model.TypeActions), nil
 }
 
 func SkipPullRequestEvent(ctx context.Context, event webhook_module.HookEventType, repoID int64, commitSHA string) bool {

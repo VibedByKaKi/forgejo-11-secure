@@ -8,8 +8,8 @@ release branches, or only as `-dev` tags, are not applied.
 
 | Line | Latest published tag | Date | Commit |
 | --- | --- | --- | --- |
-| v16 (newest stable) | **v16.0.5** | 2026-09-17 | `8d24b7d52df327118cd776cf461d34e52e0ec1ce` |
-| v15 | v15.0.9 | 2026-09-17 | `19b9b9d216bbfb501c18514bd1a8c980246ca3f7` |
+| v16 (newest stable) | **v16.0.6** | 2026-10-12 | `1aa13944143b3bc4312607239a68da23512d5ce3` |
+| v15 | v15.0.10 | 2026-10-12 | `17e1001d5e00e8ee3cbc1b6dd31be94ac38185f9` |
 | v14 | v14.0.5 | 2026-04-29 | already older than v11.0.16 |
 | v13 | v13.0.5 | 2026-01-16 | already older than v11.0.16 |
 | v12 | v12.0.4 | 2025-09-19 | already older than v11.0.16 |
@@ -19,7 +19,7 @@ same day as v15.0.4. v12–v14 security releases were merged into v11 before it
 was abandoned, so they are not repeated here. There is no stable v17 tag
 (`v17.0.0-dev` only).
 
-Future runs should start after **v16.0.5** / **v15.0.9** and ignore branch tips
+Future runs should start after **v16.0.6** / **v15.0.10** and ignore branch tips
 until those commits appear in a new tag.
 
 ## Version scheme
@@ -28,20 +28,6 @@ until those commits appear in a new tag.
 
 The GitHub release asset is `forgejo-<version>-linux-amd64` with the leading
 `v` removed, for example `forgejo-11.0.16-secure.1-linux-amd64`.
-
-## Not taken: unreleased 2026-10-12 patches
-
-These are on upstream release branches as of 2026-10-12 and are **not** in any
-tag (`v15.0.10` and `v16.0.6` do not exist). They are intentionally absent:
-
-| Branch | Commit | Change |
-| --- | --- | --- |
-| `v15.0/forgejo` | `17e1001d5e` | 2026-10-12 security patches (#14814) |
-| `v16.0/forgejo` | `1aa13944143b` | 2026-10-12 security patches (#14813) |
-| `v17.0/forgejo` | `a14eb8097737` | 2026-10-12 security patches (#14812) |
-
-Also absent, because they landed after v16.0.5 and are not in a tag: katex
-0.18.2, `golang.org/x/net` v0.60.0, and Go toolchain go1.26.9.
 
 ## Backported
 
@@ -67,14 +53,21 @@ authorization reducer), so a straight cherry-pick does not apply.
 | `github.com/klauspost/compress` v1.18.7 | `c700a1ba0c` | v15.0.6, v16.0.2 | |
 | `golang.org/x/crypto` v0.56.0 | `462b8b4993` | v15.0.8, v16.0.4 | CVE-2026-78662 and CVE-2026-56855 (SSH DoS). Module requires Go ≥ 1.26 |
 | `golang.org/x/image` v0.45.0 | `ff6d06accc` | v15.0.7, v16.0.3 | v11 already had v0.43.0 |
-| `golang.org/x/net` v0.58.0 | `7335a4d31d` (v0.56.0 security); v0.58.0 is what v15.0.7 and v16.0.5 ship | v15.0.6+ | v11 was v0.55.0. v0.60.0 is **not** in a tag |
+| `golang.org/x/net` v0.58.0 | `7335a4d31d` (v0.56.0 security); v0.58.0 is what v15.0.7 and v16.0.5 ship | v15.0.6+ | v11 was v0.55.0. Superseded by v0.60.0 below |
 | `golang.org/x/text` v0.41.0 | `7bb6ba2197` (v0.39.0 security); v0.41.0 is what v16.0.5 ships | v15.0.6+ | v11 was v0.38.0 |
 | `golang.org/x/mod` v0.40.0 (indirect) | `0776a1843d` | v15.0.7, v16.0.3 | |
 | `golang.org/x/sync` v0.22.0, `x/sys` v0.47.0, `x/tools` v0.49.0 | transitive, same versions as v16.0.5 `go.mod` | v16.0.5 | Pulled in by the modules above |
-| Go `go 1.26.0` / `toolchain go1.26.7` | `525fc5b43c`, `971568e264` | v15.0.7, v16.0.5 | Required to consume `x/crypto` v0.56.0. go1.25.14 would match the old language line but cannot compile that module. go1.26.9 is not in a Forgejo tag |
+| Go `go 1.26.0` / `toolchain go1.26.7` | `525fc5b43c`, `971568e264` | v15.0.7, v16.0.5 | Required to consume `x/crypto` v0.56.0. Superseded by go1.26.9 below |
 | mermaid 11.16.1 | `40c92cc422` | v15.0.7, v16.0.3 | lockfile updated |
 | postcss 8.5.23 | `583c447a11` | v15.0.6, v16.0.2 | lockfile updated. Intermediate 8.5.12 and 8.5.18 are included |
 | svgo 4.1.0 | `4aa4c8793f` | v15.0.8, v16.0.4 | `import {optimize} from 'svgo'` is unchanged. Intermediate 4.0.2 is included |
+| Fork `pull_request_review` and `pull_request_review_comment` run from the pull request base | `6ff8b8e14f` inside `17e1001d5e` | v15.0.10, v16.0.6 | Adapted. v15 only adds `WithPullRequest` because `getPullRequestCommitAndApproval` already chooses the base commit. v11 has no `ActionUser` trust table, so a fork review uses the base workflow when the reviewer can write actions and the poster cannot. Same-repo pull requests and a trusted poster still use the head. `IsForkPullRequest` is set, so repository secrets stay withheld |
+| Tag creation does not load attachments for an unsaved release | `65ca1b0dbe` inside `17e1001d5e` | v15.0.10, v16.0.6 | `LoadAttributes` returns before archive counts and attachments when `ID == 0`. The second `LoadAttributes` call inside `createTag` is removed |
+| Issue label delete cannot read another repository's label | `9623034655` inside `17e1001d5e` | v15.0.10, v16.0.6 | Adapted. v11's route is `DELETE .../labels/{id}` and returns 204, not the GitHub label body. The id is resolved with `GetLabelInRepoByID`, then `GetLabelInOrgByID` when the owner is an organization, so an organization label on an issue can still be removed |
+| Org and repo label deletes no longer share one id check | `5e4dc852a4` inside `17e1001d5e` | v15.0.10, v16.0.6 | `DeleteLabel` is split into `DeleteLabelInOrg` and `DeleteLabelInRepo`. A type mismatch returns an error instead of comparing an org id with a repo id |
+| `katex` 0.18.2 | `b6291844dc` | v15.0.10, v16.0.6 | Direct dependency. v11 was 0.16.21. Mermaid still nests katex 0.16.45; micromark-extension-math nests 0.16.47, same shape as the v15 lockfile |
+| `golang.org/x/net` v0.60.0 | `50d17fc53d` | v15.0.10, v16.0.6 | Also pulls `x/crypto` v0.57.0, `x/sync` v0.23.0, `x/sys` v0.48.0, `x/text` v0.42.0, and `x/mod` v0.41.0 |
+| Go toolchain `go1.26.9` | `51056ebd74` | v15.0.10, v16.0.6 | `go 1.26.0` stays. `.github/workflows/release.yml` pins `GOTOOLCHAIN`, so that pin moves to go1.26.9 with the directive |
 
 ## Skipped
 
@@ -83,7 +76,7 @@ authorization reducer), so a straight cherry-pick does not apply.
 | Actions pre-execution stored XSS | org-mode commit `0c41d71087` also edits `models/actions/pre_execution_errors.go` | `PreExecutionError` was added in v13 and is not in v11 |
 | Expand local reusable workflows from the base branch on `pull_request_target` | `841c28d1f4` inside `d4de9eb2a8` | Needs `ExpandLocalReusableWorkflows`, `WorkflowSourceCommit`, and migration registration that v11 does not have |
 | Authorization reducer and repo-specific access tokens | remainder of `d4de9eb2a8` and `06d641d5b8` | `services/authz` and `GetUserRepoPermissionWithReducer` do not exist on v11. The public-only behavior was ported separately (see above) |
-| sharp security bumps (v0.35.0 / v0.35.4) | `2c05f9af24`, `8fbae40d9c` | `sharp` is not a v11 dependency |
+| sharp security bumps (v0.35.0 / v0.35.4 / v0.35.5) | `2c05f9af24`, `8fbae40d9c`, `cb23914d45` | `sharp` is not a v11 dependency. v15.0.10 and v16.0.6 ship 0.35.5 |
 | `google.golang.org/grpc` indirect bumps | `9b6de2d5ae`, `72f8a67635`, `f2d33d5625` | grpc is not in v11 `go.mod` |
 | `github.com/jackc/pgx` | later lines | not a v11 dependency |
 | `github.com/go-ldap/ldap/v3` v3.4.14 | `77b5524f6e` | not marked `[SECURITY]` |
@@ -91,7 +84,7 @@ authorization reducer), so a straight cherry-pick does not apply.
 | go-git v5.17.1 / v5.18.0 | older `[SECURITY]` commits | v11.0.16 is already on v5.18.0 |
 | happy-dom 20.8.9, minimatch 10.2.3, webpack 5.104.1 | commits before v11.0.16 | already in v11.0.16. Later webpack/minimatch/katex numbers in v16.0.5 are not marked `[SECURITY]` |
 | 2026-01-08, 2026-05-12, and 2026-06-10 security patches | `52406dc6ea`, `9e51a55b63`, `a32151caf6` | already in v11.0.16 |
-| 2026-10-12 branch patches | see the table above | no published tag |
+| Actions trust helper and the fork-event integration test | `cc039bc494` inside `17e1001d5e` (`getPullRequestCommitAndApproval`, `UpdateTrustedWithPullRequest`, `TestActionsForkPullRequest`) | Needs `services/actions/trust.go`, `ActionUser`, and `forgery.CreateRepository`, which v11 does not have. The review-event dispatch is ported above. Other non-sync fork events (assign, label, close, and so on) already call `WithPullRequest` on v11 but still detect workflows from the head, because that trust helper is absent |
 
 ## Adaptations
 
@@ -99,3 +92,7 @@ authorization reducer), so a straight cherry-pick does not apply.
 - OpenID: upstream type-asserts `Session.Get` to `string` and panics when the key is missing. This port treats a non-string or empty value as an invalid state.
 - `CanMaintainerWriteToBranch` checks the base repository only after `LoadBaseRepo`.
 - CVE-2026-20896 removes a default. Installs that use reverse-proxy authentication must set `REVERSE_PROXY_TRUSTED_PROXIES` explicitly.
+- Fork review events: v15 relies on `getPullRequestCommitAndApproval` after `WithPullRequest`. This tree copies that decision with actions write permission, because there is no explicit-trust user table. A poster who can write still runs the head workflow.
+- Issue label delete: v15 looks up a name, then a repository id. v11 only has a numeric id, and organization labels are valid on an organization's issues, so the id is accepted from the repository or from that repository's organization.
+- `DeleteLabel` callers (`routers/api/v1/org`, `routers/api/v1/repo`, `routers/web/org`, `routers/web/repo`, `services/f3/driver`) now use `DeleteLabelInOrg` or `DeleteLabelInRepo`.
+- The GitHub release workflow hardcodes `go-version` and `GOTOOLCHAIN`. Both are go1.26.9 so the published binary is built with the toolchain in `go.mod`.

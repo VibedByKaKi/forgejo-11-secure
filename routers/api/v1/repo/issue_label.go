@@ -188,9 +188,16 @@ func DeleteIssueLabel(ctx *context.APIContext) {
 		return
 	}
 
-	label, err := issues_model.GetLabelByID(ctx, ctx.ParamsInt64(":id"))
+	// Numeric ids are only resolved inside this repository, or inside the
+	// owning organization. An unscoped id lookup returns another
+	// repository's label metadata.
+	labelID := ctx.ParamsInt64(":id")
+	label, err := issues_model.GetLabelInRepoByID(ctx, ctx.Repo.Repository.ID, labelID)
+	if err != nil && issues_model.IsErrRepoLabelNotExist(err) && ctx.Repo.Owner.IsOrganization() {
+		label, err = issues_model.GetLabelInOrgByID(ctx, ctx.Repo.Owner.ID, labelID)
+	}
 	if err != nil {
-		if issues_model.IsErrLabelNotExist(err) {
+		if issues_model.IsErrRepoLabelNotExist(err) || issues_model.IsErrOrgLabelNotExist(err) || issues_model.IsErrLabelNotExist(err) {
 			ctx.Error(http.StatusUnprocessableEntity, "", err)
 		} else {
 			ctx.Error(http.StatusInternalServerError, "GetLabelByID", err)

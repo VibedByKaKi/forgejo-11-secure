@@ -149,6 +149,29 @@ func TestAPIAddIssueLabelsWithLabelNames(t *testing.T) {
 	MakeRequest(t, req, http.StatusNoContent)
 }
 
+func TestAPIRemoveIssueLabelByID(t *testing.T) {
+	defer tests.PrepareTestEnv(t)()
+
+	repo := unittest.AssertExistsAndLoadBean(t, &repo_model.Repository{ID: 1})
+	issue := unittest.AssertExistsAndLoadBean(t, &issues_model.Issue{RepoID: repo.ID, Index: 1})
+	owner := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: repo.OwnerID})
+	issueLabel := unittest.AssertExistsAndLoadBean(t, &issues_model.IssueLabel{IssueID: issue.ID})
+	token := getUserToken(t, owner.LowerName, auth_model.AccessTokenScopeWriteIssue)
+
+	deleteURLWrongRepo := fmt.Sprintf("/api/v1/repos/user2/repo2/issues/1/labels/%d", issueLabel.LabelID)
+	req := NewRequest(t, "DELETE", deleteURLWrongRepo).AddTokenAuth(token)
+	resp := MakeRequest(t, req, http.StatusUnprocessableEntity)
+	assert.Contains(t, resp.Body.String(), "label does not exist")
+	unittest.AssertExistsAndLoadBean(t, &issues_model.IssueLabel{IssueID: issue.ID, LabelID: issueLabel.LabelID})
+
+	deleteURL := fmt.Sprintf("/api/v1/repos/%s/%s/issues/%d/labels/%d", owner.Name, repo.Name, issue.Index, issueLabel.LabelID)
+	req = NewRequest(t, "DELETE", deleteURL).AddTokenAuth(token)
+	MakeRequest(t, req, http.StatusNoContent)
+
+	unittest.AssertNotExistsBean(t, &issues_model.IssueLabel{IssueID: issue.ID, LabelID: issueLabel.LabelID})
+	unittest.AssertExistsAndLoadBean(t, &issues_model.Label{ID: issueLabel.LabelID, RepoID: repo.ID})
+}
+
 func TestAPIAddIssueLabelsAutoDate(t *testing.T) {
 	defer tests.PrepareTestEnv(t)()
 

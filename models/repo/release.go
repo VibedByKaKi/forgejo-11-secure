@@ -113,6 +113,14 @@ func (r *Release) LoadAttributes(ctx context.Context) error {
 		}
 	}
 
+	// This function may be called on a release that's not yet in the database.
+	// The next two attributes rely on the release struct already having been
+	// assigned an ID. Return early if that's not the case, so tag creation
+	// does not load every attachment stored with release_id 0.
+	if r.ID == 0 {
+		return nil
+	}
+
 	err = r.LoadArchiveDownloadCount(ctx)
 	if err != nil {
 		return err
