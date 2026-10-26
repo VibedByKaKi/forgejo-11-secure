@@ -367,9 +367,10 @@ func SearchRepositoryCondition(opts *SearchRepoOptions) builder.Cond {
 		cond = cond.And(builder.In("id", builder.Select("repo_id").From("star").Where(builder.Eq{"uid": opts.StarredByID})))
 	}
 
-	// Restrict to watched repositories
+	// Restrict to watched repositories. WatchModeDont is an explicit unwatch and
+	// must not be treated as a subscription.
 	if opts.WatchedByID > 0 {
-		cond = cond.And(builder.In("id", builder.Select("repo_id").From("watch").Where(builder.Eq{"user_id": opts.WatchedByID})))
+		cond = cond.And(builder.In("id", builder.Select("repo_id").From("watch").Where(builder.Eq{"user_id": opts.WatchedByID}).And(builder.Neq{"`watch`.mode": WatchModeDont})))
 	}
 
 	// Restrict repositories to those the OwnerID owns or contributes to as per opts.Collaborate

@@ -43,5 +43,10 @@ func (a *Auth) Verify(req *http.Request, w http.ResponseWriter, store auth.DataS
 		log.Error("UpdateAccessToken:  %v", err)
 	}
 
+	// The API key is an access token. Without these fields, reqPackageAccess
+	// treats the request as unscoped and skips the package scope check.
+	store.GetData()["IsApiToken"] = true
+	store.GetData()["ApiTokenScope"] = token.Scope
+
 	return u, nil
 }

@@ -145,3 +145,18 @@ func TestForkReviewWorkflowsFromBase(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, fromBase)
 }
+
+func TestPullRequestReviewRefUsesPullHead(t *testing.T) {
+	pr := &issues_model.PullRequest{Index: 4}
+	// PullRequestReview must not call WithRef(review.CommitID). WithPullRequest
+	// then sets forgejo.ref to refs/pull/%d/head.
+	input := newNotifyInput(nil, nil, webhook_module.HookEventPullRequestReviewApproved).
+		WithPullRequest(pr)
+	assert.Equal(t, "refs/pull/4/head", input.Ref.String())
+
+	// WithRef wins when it is set first, which is why an untrusted commit id must not be passed.
+	poisoned := newNotifyInput(nil, nil, webhook_module.HookEventPullRequestReviewApproved).
+		WithRef("deadbeefcafebabe").
+		WithPullRequest(pr)
+	assert.Equal(t, "deadbeefcafebabe", poisoned.Ref.String())
+}

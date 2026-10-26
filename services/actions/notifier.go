@@ -447,8 +447,12 @@ func (n *actionsNotifier) PullRequestReview(ctx context.Context, pr *issues_mode
 		return
 	}
 
+	// review.CommitID is untrusted, user-entered content. Anyone can provide an
+	// arbitrary value through the API, and the review system does not validate
+	// that it is a commit in the pull request (a force-push during review makes
+	// that check unreliable). It must not be used as the workflow ref.
+	// WithPullRequest sets the ref to refs/pull/%d/head, matching GitHub.
 	newNotifyInput(review.Issue.Repo, review.Reviewer, reviewHookType).
-		WithRef(review.CommitID).
 		WithPayload(&api.PullRequestPayload{
 			Action:      api.HookIssueReviewed,
 			Index:       review.Issue.Index,

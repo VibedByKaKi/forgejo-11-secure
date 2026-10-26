@@ -8,19 +8,24 @@ release branches, or only as `-dev` tags, are not applied.
 
 | Line | Latest published tag | Date | Commit |
 | --- | --- | --- | --- |
-| v16 (newest stable) | **v16.0.6** | 2026-10-12 | `1aa13944143b3bc4312607239a68da23512d5ce3` |
-| v15 | v15.0.10 | 2026-10-12 | `17e1001d5e00e8ee3cbc1b6dd31be94ac38185f9` |
+| v17 (newest stable) | **v17.0.1** | 2026-10-26 | `363f3dc30beef902b187af5a5244ff7af44901e6` |
+| v16 | v16.0.7 | 2026-10-26 | `44861ff4ed2bdcbf2607d250600203a75ed94c59` |
+| v15 | v15.0.11 | 2026-10-26 | `753f7edc775a97e66cd13d410404d5edc99b6b04` |
 | v14 | v14.0.5 | 2026-04-29 | already older than v11.0.16 |
 | v13 | v13.0.5 | 2026-01-16 | already older than v11.0.16 |
 | v12 | v12.0.4 | 2025-09-19 | already older than v11.0.16 |
 
 v11.0.16 itself is `0b2b072dcecbde8a53770855fd9c57cc54f276c3` (2026-07-09), the
 same day as v15.0.4. v12–v14 security releases were merged into v11 before it
-was abandoned, so they are not repeated here. There is no stable v17 tag
-(`v17.0.0-dev` only).
+was abandoned, so they are not repeated here.
 
-Future runs should start after **v16.0.6** / **v15.0.10** and ignore branch tips
-until those commits appear in a new tag.
+v17.0.0 (`0d791421f85ca13a63b665053d81ea765fbbc571`, 2026-10-15) was checked
+after it was published. Its `[SECURITY]` commits are `golang.org/x/net` v0.60.0,
+toolchain go1.26.9 (both already backported from v15.0.10 / v16.0.6), and
+`sharp` 0.35.5 (already skipped; not a v11 dependency). Nothing new to apply.
+
+Future runs should start after **v17.0.1** / **v16.0.7** / **v15.0.11** and
+ignore branch tips until those commits appear in a new tag.
 
 ## Version scheme
 
@@ -67,7 +72,13 @@ authorization reducer), so a straight cherry-pick does not apply.
 | Org and repo label deletes no longer share one id check | `5e4dc852a4` inside `17e1001d5e` | v15.0.10, v16.0.6 | `DeleteLabel` is split into `DeleteLabelInOrg` and `DeleteLabelInRepo`. A type mismatch returns an error instead of comparing an org id with a repo id |
 | `katex` 0.18.2 | `b6291844dc` | v15.0.10, v16.0.6 | Direct dependency. v11 was 0.16.21. Mermaid still nests katex 0.16.45; micromark-extension-math nests 0.16.47, same shape as the v15 lockfile |
 | `golang.org/x/net` v0.60.0 | `50d17fc53d` | v15.0.10, v16.0.6 | Also pulls `x/crypto` v0.57.0, `x/sync` v0.23.0, `x/sys` v0.48.0, `x/text` v0.42.0, and `x/mod` v0.41.0 |
-| Go toolchain `go1.26.9` | `51056ebd74` | v15.0.10, v16.0.6 | `go 1.26.0` stays. `.github/workflows/release.yml` pins `GOTOOLCHAIN`, so that pin moves to go1.26.9 with the directive |
+| Go toolchain `go1.26.9` | `51056ebd74` | v15.0.10, v16.0.6 | `go 1.26.0` stays. `.github/workflows/release.yml` pins `GOTOOLCHAIN`, so that pin moves to go1.26.9 with the directive. Superseded by go1.26.10 below |
+| `pull_request_review` Actions use `refs/pull/%d/head`, not the review `commit_id` | `291cf01266` inside `753f7edc77` | v15.0.11, v16.0.7, v17.0.1 | `WithRef(review.CommitID)` is removed. `WithPullRequest` sets the ref. v11 has no `TestActionsForkPullRequest` harness, so `TestPullRequestReviewRefUsesPullHead` covers the ref contract |
+| Visibility of users when listing watched and starred repositories | `16811fea1f`, `3f3e8bea89`, `dae5735aee`, `e0bfad0d6c` inside `753f7edc77` | v15.0.11, v16.0.7, v17.0.1 | API lists go through `SearchRepository` (`Actor` is the viewer, `Private` follows sign-in). Permissions use the viewer. `GetStarredRepos` / `GetWatchedRepos` are removed. Watched search excludes `WatchModeDont`. No authorization reducer on v11 |
+| NuGet `X-NuGet-ApiKey` access tokens respect package scopes | `4ff23f1ffb` inside `753f7edc77` | v15.0.11, v16.0.7, v17.0.1 | v11 stores the scope on the request (`IsApiToken`, `ApiTokenScope`) instead of an auth-result `Scope()`. basic, oauth2, container, and conan already did. chef and HTTP signatures are not access tokens |
+| Single quotes around pull-request checkout and merge commands | `e5145ff6a5` | v17.0.1 | v11 template had no quotes (`git checkout`, not `git switch`). A branch name could run a shell substitution when the instructions were pasted. Quotes match the v17 fix |
+| Go toolchain `go1.26.10` | `5f7f338795` | v15.0.11, v16.0.7, v17.0.1 | `go 1.26.0` stays. `.github/workflows/release.yml` `go-version` and `GOTOOLCHAIN` move to go1.26.10 |
+| `happy-dom` 21.0.4 | `115c57529a` | v15.0.11, v16.0.7, v17.0.1 | Frontend test devDependency. v11 was 20.8.9. Lockfile also takes `buffer-image-size` 0.6.4 and `ws` 8.22.0, same as the v15 bump |
 
 ## Skipped
 
@@ -84,7 +95,9 @@ authorization reducer), so a straight cherry-pick does not apply.
 | go-git v5.17.1 / v5.18.0 | older `[SECURITY]` commits | v11.0.16 is already on v5.18.0 |
 | happy-dom 20.8.9, minimatch 10.2.3, webpack 5.104.1 | commits before v11.0.16 | already in v11.0.16. Later webpack/minimatch/katex numbers in v16.0.5 are not marked `[SECURITY]` |
 | 2026-01-08, 2026-05-12, and 2026-06-10 security patches | `52406dc6ea`, `9e51a55b63`, `a32151caf6` | already in v11.0.16 |
-| Actions trust helper and the fork-event integration test | `cc039bc494` inside `17e1001d5e` (`getPullRequestCommitAndApproval`, `UpdateTrustedWithPullRequest`, `TestActionsForkPullRequest`) | Needs `services/actions/trust.go`, `ActionUser`, and `forgery.CreateRepository`, which v11 does not have. The review-event dispatch is ported above. Other non-sync fork events (assign, label, close, and so on) already call `WithPullRequest` on v11 but still detect workflows from the head, because that trust helper is absent |
+| Actions trust helper and the fork-event integration test | `cc039bc494` inside `17e1001d5e` (`getPullRequestCommitAndApproval`, `UpdateTrustedWithPullRequest`, `TestActionsForkPullRequest`) | Needs `services/actions/trust.go`, `ActionUser`, and `forgery.CreateRepository`, which v11 does not have. The review-event dispatch is ported above. Other non-sync fork events (assign, label, close, and so on) already call `WithPullRequest` on v11 but still detect workflows from the head, because that trust helper is absent. The v15.0.11 `expectedRef` extension of that same test is skipped for the same reason |
+| Type confusion in `GetProjectByIDForOwner` | `520afcaf8e` | v17.0.1 only. The helper and `ensureProjectOwnedBy` are not in v11. Repo routes compare `RepoID` with the repository, and user/org routes compare `OwnerID` with the user. `CanBeAccessedByOwnerRepo` already rejects a user id used as a repository id |
+| NuGet authorization reducer | reducer half of `4ff23f1ffb` | `services/authz` is not on v11. The scope return is ported above |
 
 ## Adaptations
 
@@ -95,4 +108,7 @@ authorization reducer), so a straight cherry-pick does not apply.
 - Fork review events: v15 relies on `getPullRequestCommitAndApproval` after `WithPullRequest`. This tree copies that decision with actions write permission, because there is no explicit-trust user table. A poster who can write still runs the head workflow.
 - Issue label delete: v15 looks up a name, then a repository id. v11 only has a numeric id, and organization labels are valid on an organization's issues, so the id is accepted from the repository or from that repository's organization.
 - `DeleteLabel` callers (`routers/api/v1/org`, `routers/api/v1/repo`, `routers/web/org`, `routers/web/repo`, `services/f3/driver`) now use `DeleteLabelInOrg` or `DeleteLabelInRepo`.
-- The GitHub release workflow hardcodes `go-version` and `GOTOOLCHAIN`. Both are go1.26.9 so the published binary is built with the toolchain in `go.mod`.
+- The GitHub release workflow hardcodes `go-version` and `GOTOOLCHAIN`. Both are go1.26.10 so the published binary is built with the toolchain in `go.mod`.
+- Watched and starred API lists use `SearchRepository` without `AuthorizationReducer`. Signed-in viewers who are not admins are limited by `AccessibleRepositoryCondition`. Admins still see every repository the search returns, which is the existing v11 search behavior.
+- NuGet scope enforcement uses `store` `IsApiToken` / `ApiTokenScope`, which `reqPackageAccess` already reads. The v15 auth-result `Scope()` and `Reducer()` methods do not exist here.
+- Pull-request CLI instructions keep `git checkout`. Only the quoting changes, from bare words to single quotes.

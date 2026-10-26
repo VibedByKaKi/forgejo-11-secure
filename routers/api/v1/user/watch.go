@@ -4,7 +4,6 @@
 package user
 
 import (
-	std_context "context"
 	"net/http"
 
 	"forgejo.org/models/db"
@@ -17,16 +16,24 @@ import (
 	"forgejo.org/services/convert"
 )
 
-// getWatchedRepos returns the repos that the user with the specified userID is watching
-func getWatchedRepos(ctx std_context.Context, user *user_model.User, private bool, listOptions db.ListOptions) ([]*api.Repository, int64, error) {
-	watchedRepos, total, err := repo_model.GetWatchedRepos(ctx, user.ID, private, listOptions)
+// getWatchedRepos returns the repos that the user with the specified userID is watching.
+// SearchRepository applies owner visibility, so a public repository owned by a
+// private user or organization is not listed for someone who cannot see that
+// owner. Permissions in the response are the viewer's, not the profile user's.
+func getWatchedRepos(ctx *context.APIContext, user *user_model.User, listOptions db.ListOptions) ([]*api.Repository, int64, error) {
+	watchedRepos, total, err := repo_model.SearchRepository(ctx, &repo_model.SearchRepoOptions{
+		ListOptions: listOptions,
+		Actor:       ctx.Doer,
+		WatchedByID: user.ID,
+		Private:     ctx.IsSigned,
+	})
 	if err != nil {
 		return nil, 0, err
 	}
 
 	repos := make([]*api.Repository, len(watchedRepos))
 	for i, watched := range watchedRepos {
-		permission, err := access_model.GetUserRepoPermission(ctx, watched, user)
+		permission, err := access_model.GetUserRepoPermission(ctx, watched, ctx.Doer)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -62,10 +69,10 @@ func GetWatchedRepos(ctx *context.APIContext) {
 	//   "404":
 	//     "$ref": "#/responses/notFound"
 
-	private := ctx.ContextUser.ID == ctx.Doer.ID
-	repos, total, err := getWatchedRepos(ctx, ctx.ContextUser, private, utils.GetListOptions(ctx))
+	repos, total, err := getWatchedRepos(ctx, ctx.ContextUser, utils.GetListOptions(ctx))
 	if err != nil {
 		ctx.Error(http.StatusInternalServerError, "getWatchedRepos", err)
+		return
 	}
 
 	ctx.SetTotalCountHeader(total)
@@ -96,9 +103,10 @@ func GetMyWatchedRepos(ctx *context.APIContext) {
 	//   "403":
 	//     "$ref": "#/responses/forbidden"
 
-	repos, total, err := getWatchedRepos(ctx, ctx.Doer, true, utils.GetListOptions(ctx))
+	repos, total, err := getWatchedRepos(ctx, ctx.Doer, utils.GetListOptions(ctx))
 	if err != nil {
 		ctx.Error(http.StatusInternalServerError, "getWatchedRepos", err)
+		return
 	}
 
 	ctx.SetTotalCountHeader(total)
