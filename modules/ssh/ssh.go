@@ -250,14 +250,14 @@ func publicKeyHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 		log.Debug("Handle Public Key: %s Fingerprint: %s is not a certificate", ctx.RemoteAddr(), gossh.FingerprintSHA256(key))
 	}
 
-	pkey, err := asymkey_model.SearchPublicKeyByContent(ctx, strings.TrimSpace(string(gossh.MarshalAuthorizedKey(key))))
+	pkey, err := asymkey_model.SearchPublicKeyForSSH(ctx, key)
 	if err != nil {
 		if asymkey_model.IsErrKeyNotExist(err) {
 			log.Warn("Unknown public key: %s from %s", gossh.FingerprintSHA256(key), ctx.RemoteAddr())
 			log.Warn("Failed authentication attempt from %s", ctx.RemoteAddr())
 			return false
 		}
-		log.Error("SearchPublicKeyByContent: %v", err)
+		log.Error("SearchPublicKeyForSSH: %v", err)
 		return false
 	}
 

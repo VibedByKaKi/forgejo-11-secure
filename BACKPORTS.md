@@ -8,9 +8,9 @@ release branches, or only as `-dev` tags, are not applied.
 
 | Line | Latest published tag | Date | Commit |
 | --- | --- | --- | --- |
-| v17 (newest stable) | **v17.0.1** | 2026-10-26 | `363f3dc30beef902b187af5a5244ff7af44901e6` |
+| v17 (newest stable) | **v17.0.2** | 2026-11-18 | `eea4b0052f24f5ee986b46c00ebf30bdbbf654cb` |
 | v16 | v16.0.7 | 2026-10-26 | `44861ff4ed2bdcbf2607d250600203a75ed94c59` |
-| v15 | v15.0.11 | 2026-10-26 | `753f7edc775a97e66cd13d410404d5edc99b6b04` |
+| v15 | v15.0.12 | 2026-11-18 | `94c6cd65f5c25043e5c9fdb9328d1b8d3f89941a` |
 | v14 | v14.0.5 | 2026-04-29 | already older than v11.0.16 |
 | v13 | v13.0.5 | 2026-01-16 | already older than v11.0.16 |
 | v12 | v12.0.4 | 2025-09-19 | already older than v11.0.16 |
@@ -24,7 +24,11 @@ after it was published. Its `[SECURITY]` commits are `golang.org/x/net` v0.60.0,
 toolchain go1.26.9 (both already backported from v15.0.10 / v16.0.6), and
 `sharp` 0.35.5 (already skipped; not a v11 dependency). Nothing new to apply.
 
-Future runs should start after **v17.0.1** / **v16.0.7** / **v15.0.11** and
+v16 has no published tag after v16.0.7. v17.0.2 and v15.0.12 (both 2026-11-18)
+carry the same security set. The v15 commit is the one named below when both
+lines have the fix.
+
+Future runs should start after **v17.0.2** / **v16.0.7** / **v15.0.12** and
 ignore branch tips until those commits appear in a new tag.
 
 ## Version scheme
@@ -79,6 +83,17 @@ authorization reducer), so a straight cherry-pick does not apply.
 | Single quotes around pull-request checkout and merge commands | `e5145ff6a5` | v17.0.1 | v11 template had no quotes (`git checkout`, not `git switch`). A branch name could run a shell substitution when the instructions were pasted. Quotes match the v17 fix |
 | Go toolchain `go1.26.10` | `5f7f338795` | v15.0.11, v16.0.7, v17.0.1 | `go 1.26.0` stays. `.github/workflows/release.yml` `go-version` and `GOTOOLCHAIN` move to go1.26.10 |
 | `happy-dom` 21.0.4 | `115c57529a` | v15.0.11, v16.0.7, v17.0.1 | Frontend test devDependency. v11 was 20.8.9. Lockfile also takes `buffer-image-size` 0.6.4 and `ws` 8.22.0, same as the v15 bump |
+| Search authorized SSH keys by fingerprint, then compare the key bytes | `94c6cd65f5` | v15.0.12, v17.0.2 | [v15 #15299](https://codeberg.org/forgejo/forgejo/pulls/15299) / [v17 #15298](https://codeberg.org/forgejo/forgejo/pulls/15298). Replaces the SQL `LIKE` on key text. The same commit includes the v17 fingerprint lookup ([#13614](https://codeberg.org/forgejo/forgejo/pulls/13614)) that v15 needed for the fix. `cmd/keys` stays on urfave/cli v2, parses the key, and sends `SHA256` fingerprint. A missing key returns `# No key found` |
+| Primary email must already be activated | `94c6cd65f5` | v15.0.12, v17.0.2 | [v15 #15299](https://codeberg.org/forgejo/forgejo/pulls/15299) / [v17 #15298](https://codeberg.org/forgejo/forgejo/pulls/15298). `MakeEmailAddressPrimary` returns `ErrEmailNotActivated`. `ReplaceInactivePrimaryEmail` still uses the unexported helper |
+| Commit `tree` / `parent` / `author` / `committer` headers are positional | `94c6cd65f5` | v15.0.12, v17.0.2 | [v15 #15299](https://codeberg.org/forgejo/forgejo/pulls/15299) / [v17 #15298](https://codeberg.org/forgejo/forgejo/pulls/15298). Later copies of those headers stay in the payload and do not replace the real commit. `encoding` and `change-id` still go to the payload |
+| `/tree-list` and `/find` require the code unit | `94c6cd65f5` | v15.0.12, v17.0.2 | [v15 #15299](https://codeberg.org/forgejo/forgejo/pulls/15299) / [v17 #15298](https://codeberg.org/forgejo/forgejo/pulls/15298). `reqRepoCodeReader` on both routes |
+| Public-only tokens cannot read private repositories in activity feeds or the heatmap | public-only half of `94c6cd65f5` | v15.0.12, v17.0.2 | [v15 #15299](https://codeberg.org/forgejo/forgejo/pulls/15299) / [v17 #15298](https://codeberg.org/forgejo/forgejo/pulls/15298). No authorization reducer. `IsPublicOnly` adds the public-repository subquery used by feeds and the heatmap |
+| Debian packages parsed with `pault.ag/go/debian` v0.21.4 | `b6b96a2ca9` | v15.0.12, v17.0.2 | [v15 #15304](https://codeberg.org/forgejo/forgejo/pulls/15304) / [v17 #15302](https://codeberg.org/forgejo/forgejo/pulls/15302), backport of [#15242](https://codeberg.org/forgejo/forgejo/pulls/15242). `ParsePackage` takes `io.ReaderAt`. Tests still build archives with `blakesmith/ar`. The module requires `klauspost/compress` v1.20.3, `ulikunitz/xz` v0.5.17, `ProtonMail/go-crypto` v1.5.2, and `cloudflare/circl` v1.6.5 |
+| `minimatch` 11.0.1 | `70f889ebb2` | v15.0.12, v17.0.2 | [v15 #15083](https://codeberg.org/forgejo/forgejo/pulls/15083) / [v17 #15085](https://codeberg.org/forgejo/forgejo/pulls/15085). `[SECURITY]`. Direct dependency. `import {minimatch} from 'minimatch'` is unchanged. v11 was 10.2.3 |
+| `github.com/andybalholm/brotli` v1.2.7 | `0c83767960` | v15.0.12, v17.0.2 | [v15 #15158](https://codeberg.org/forgejo/forgejo/pulls/15158) / [v17 #15160](https://codeberg.org/forgejo/forgejo/pulls/15160). `[SECURITY]`. Indirect. v11 was v1.1.1. The v17 PR was closed as already included by the tag |
+| `github.com/klauspost/compress` v1.20.3 | `2f15a8d128` (v1.20.2 `[SECURITY]`), then `b6b96a2ca9` | v15.0.12, v17.0.2 | [v15 #15159](https://codeberg.org/forgejo/forgejo/pulls/15159) / [v17 #15161](https://codeberg.org/forgejo/forgejo/pulls/15161) bump to v1.20.2. The debian parser commit in the same tags requires v1.20.3, which is what v15.0.12 and v17.0.2 ship. v11 was v1.18.7 |
+| `golang.org/x/net` v0.62.0 | `44426ef404` | v15.0.12, v17.0.2 | [v15 #15063](https://codeberg.org/forgejo/forgejo/pulls/15063) / [v17 #15065](https://codeberg.org/forgejo/forgejo/pulls/15065). `[SECURITY]`. Also pulls `x/crypto` v0.58.0, `x/sync` v0.24.0, `x/sys` v0.49.0, `x/text` v0.43.0, and `x/tools` v0.51.0 |
+| Go toolchain `go1.26.11` | `11c63cb45e` | v15.0.12, v17.0.2 | [v15 #15224](https://codeberg.org/forgejo/forgejo/pulls/15224) / [v17 #15225](https://codeberg.org/forgejo/forgejo/pulls/15225). The commit title is not `[SECURITY]`. Both published tags pin this toolchain, and `.github/workflows/release.yml` follows `go.mod`, same as go1.26.10. `go 1.26.0` stays |
 
 ## Skipped
 
@@ -98,6 +113,8 @@ authorization reducer), so a straight cherry-pick does not apply.
 | Actions trust helper and the fork-event integration test | `cc039bc494` inside `17e1001d5e` (`getPullRequestCommitAndApproval`, `UpdateTrustedWithPullRequest`, `TestActionsForkPullRequest`) | Needs `services/actions/trust.go`, `ActionUser`, and `forgery.CreateRepository`, which v11 does not have. The review-event dispatch is ported above. Other non-sync fork events (assign, label, close, and so on) already call `WithPullRequest` on v11 but still detect workflows from the head, because that trust helper is absent. The v15.0.11 `expectedRef` extension of that same test is skipped for the same reason |
 | Type confusion in `GetProjectByIDForOwner` | `520afcaf8e` | v17.0.1 only. The helper and `ensureProjectOwnedBy` are not in v11. Repo routes compare `RepoID` with the repository, and user/org routes compare `OwnerID` with the user. `CanBeAccessedByOwnerRepo` already rejects a user id used as a repository id |
 | NuGet authorization reducer | reducer half of `4ff23f1ffb` | `services/authz` is not on v11. The scope return is ported above |
+| Repo-specific access tokens on activity feeds and the heatmap | reducer half of `94c6cd65f5` / `eea4b0052f` | `services/authz`, `ctx.Reducer()`, and `createFineGrainedRepoAccessToken` are not on v11. The semgrep rule that requires `AuthorizationReducer` on `GetFeedsOptions` is the same feature. The public-only half is ported above |
+| Replace `blakesmith/ar` with the `code.forgejo.org/crystal/ar` mirror | `3e36a8f11a` / `e02b117` | Not marked `[SECURITY]`. The author describes the govulncheck report as a request-level panic, not an exploitable issue. The debian parser change in the same tags removes production use of that library |
 
 ## Adaptations
 
@@ -112,3 +129,8 @@ authorization reducer), so a straight cherry-pick does not apply.
 - Watched and starred API lists use `SearchRepository` without `AuthorizationReducer`. Signed-in viewers who are not admins are limited by `AccessibleRepositoryCondition`. Admins still see every repository the search returns, which is the existing v11 search behavior.
 - NuGet scope enforcement uses `store` `IsApiToken` / `ApiTokenScope`, which `reqPackageAccess` already reads. The v15 auth-result `Scope()` and `Reducer()` methods do not exist here.
 - Pull-request CLI instructions keep `git checkout`. Only the quoting changes, from bare words to single quotes.
+- SSH authorized-key lookup uses the fingerprint index that already exists on v11. `cmd/keys` stays on urfave/cli v2. LDAP sync compares stored key rows instead of searching by `LIKE`.
+- `ReplaceInactivePrimaryEmail` calls the unexported primary-email helper, so replacing an inactive primary during registration still works. The settings form redirects when the address is missing or not activated.
+- Commit parsing keeps `encoding` and `change-id` in the signature payload. A second `tree`, `parent`, `author`, or `committer` after the positional headers does not replace them.
+- Activity feeds and the heatmap do not grow an `AuthorizationReducer` field. A public-only token adds a repository subquery from `PublicRepositoryFilter`, which matches `RepoVisibleToPublicOnly`.
+- The GitHub release workflow `go-version` and `GOTOOLCHAIN` are go1.26.11, matching `go.mod`.

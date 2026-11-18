@@ -11,10 +11,12 @@ import (
 
 	activities_model "forgejo.org/models/activities"
 	auth_model "forgejo.org/models/auth"
+	"forgejo.org/models/db"
 	"forgejo.org/modules/timeutil"
 	"forgejo.org/tests"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUserHeatmap(t *testing.T) {
@@ -36,4 +38,39 @@ func TestUserHeatmap(t *testing.T) {
 	dummyheatmap = append(dummyheatmap, &activities_model.UserHeatmapData{Timestamp: 1603227600, Contributions: 1})
 
 	assert.Equal(t, dummyheatmap, heatmap)
+}
+
+func TestAPIUserHeatmapPublicOnly(t *testing.T) {
+	defer tests.PrepareTestEnv(t)()
+
+	timeutil.MockSet(time.Date(2020, 10, 21, 0, 0, 0, 0, time.UTC))
+	defer timeutil.MockUnset()
+
+	// Fixtures contain one contribution to private user2/repo2.
+	// Add a public contribution in a separate heatmap bucket.
+	_, err := db.GetEngine(db.DefaultContext).NoAutoTime().Insert(&activities_model.Action{
+		UserID: 2, ActUserID: 2, RepoID: 1,
+		OpType:      activities_model.ActionCreateRepo,
+		CreatedUnix: 1603231200,
+	})
+	require.NoError(t, err)
+
+	scopes := []auth_model.AccessTokenScope{auth_model.AccessTokenScopeReadUser, auth_model.AccessTokenScopeReadRepository}
+	unrestrictedToken := getUserToken(t, "user2", scopes...)
+	req := NewRequest(t, "GET", "/api/v1/users/user2/heatmap").AddTokenAuth(unrestrictedToken)
+	resp := MakeRequest(t, req, http.StatusOK)
+	var heatmap []*activities_model.UserHeatmapData
+	DecodeJSON(t, resp, &heatmap)
+	assert.Equal(t, []*activities_model.UserHeatmapData{
+		{Timestamp: 1603227600, Contributions: 1},
+		{Timestamp: 1603231200, Contributions: 1},
+	}, heatmap)
+
+	token := getTokenForLoggedInUser(t, loginUser(t, "user2"), append(scopes, auth_model.AccessTokenScopePublicOnly)...)
+	req = NewRequest(t, "GET", "/api/v1/users/user2/heatmap").AddTokenAuth(token)
+	resp = MakeRequest(t, req, http.StatusOK)
+	DecodeJSON(t, resp, &heatmap)
+	assert.Equal(t, []*activities_model.UserHeatmapData{
+		{Timestamp: 1603231200, Contributions: 1},
+	}, heatmap)
 }

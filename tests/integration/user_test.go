@@ -1122,3 +1122,38 @@ func TestActivateEmailAddress(t *testing.T) {
 	unittest.AssertNotExistsBean(t, &auth_model.AuthorizationToken{ID: authToken.ID})
 	unittest.AssertExistsAndLoadBean(t, &user_model.EmailAddress{UID: user2.ID, IsActivated: true, Email: "newemail@example.org"})
 }
+
+func TestMakeEmailAddressPrimary(t *testing.T) {
+	defer tests.PrepareTestEnv(t)()
+
+	user2 := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: 2})
+	session := loginUser(t, user2.Name)
+
+	t.Run("Not activated", func(t *testing.T) {
+		defer tests.PrintCurrentTest(t)()
+
+		email := unittest.AssertExistsAndLoadBean(t, &user_model.EmailAddress{ID: 35, UID: user2.ID}, "is_activated = false")
+		req := NewRequestWithValues(t, "POST", "/user/settings/account/email", map[string]string{
+			"_csrf":   GetCSRF(t, session, "/user/settings"),
+			"_method": "PRIMARY",
+			"id":      strconv.FormatInt(email.ID, 10),
+		})
+		session.MakeRequest(t, req, http.StatusSeeOther)
+
+		unittest.AssertExistsIf(t, true, &user_model.User{ID: user2.ID, Email: user2.Email})
+		unittest.AssertExistsIf(t, true, &user_model.EmailAddress{ID: email.ID}, "is_primary = false")
+	})
+
+	t.Run("Nonexistent", func(t *testing.T) {
+		defer tests.PrintCurrentTest(t)()
+
+		req := NewRequestWithValues(t, "POST", "/user/settings/account/email", map[string]string{
+			"_csrf":   GetCSRF(t, session, "/user/settings"),
+			"_method": "PRIMARY",
+			"id":      strconv.FormatInt(unittest.NonexistentID, 10),
+		})
+		session.MakeRequest(t, req, http.StatusSeeOther)
+
+		unittest.AssertExistsIf(t, true, &user_model.User{ID: user2.ID, Email: user2.Email})
+	})
+}

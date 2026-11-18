@@ -7,6 +7,9 @@ import (
 	"context"
 
 	repo_model "forgejo.org/models/repo"
+	"forgejo.org/modules/structs"
+
+	"xorm.io/builder"
 )
 
 // PublicOnlyContextKey marks an API request whose token is limited to public resources.
@@ -36,4 +39,18 @@ func RepoVisibleToPublicOnly(ctx context.Context, repo *repo_model.Repository) (
 		return false, err
 	}
 	return !repo.IsPrivate && repo.Owner.Visibility.IsPublic(), nil
+}
+
+// PublicRepositoryFilter is the SQL form of RepoVisibleToPublicOnly.
+// Column names are unqualified so the condition can be applied to a repository subquery.
+func PublicRepositoryFilter() builder.Cond {
+	return builder.And(
+		builder.Eq{"is_private": false},
+		builder.NotIn("owner_id", builder.Select("id").From("`user`").Where(
+			builder.Or(
+				builder.Eq{"visibility": structs.VisibleTypeLimited},
+				builder.Eq{"visibility": structs.VisibleTypePrivate},
+			),
+		)),
+	)
 }

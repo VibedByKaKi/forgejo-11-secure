@@ -488,6 +488,15 @@ func ActivityReadable(user, doer *user_model.User) bool {
 func activityQueryCondition(ctx context.Context, opts GetFeedsOptions) (builder.Cond, error) {
 	cond := builder.NewCond()
 
+	// v11 has public-only tokens but not the authorization reducer. The same
+	// restriction the later reducer applies to activity feeds and heatmaps is
+	// expressed here so a public-only token cannot read private repositories.
+	if access_model.IsPublicOnly(ctx) {
+		cond = cond.And(builder.In("`action`.repo_id",
+			builder.Select("id").From("repository").Where(access_model.PublicRepositoryFilter()),
+		))
+	}
+
 	if opts.OnlyPerformedByActor {
 		cond = cond.And(builder.Expr("`action`.user_id = `action`.act_user_id"))
 	}

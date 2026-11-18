@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"forgejo.org/models/db"
+	"forgejo.org/models/organization"
 	repo_model "forgejo.org/models/repo"
 	unit_model "forgejo.org/models/unit"
 	"forgejo.org/models/unittest"
@@ -1442,4 +1443,17 @@ func TestBlameDirectory(t *testing.T) {
 	// Blame is not allowed
 	req = NewRequest(t, "GET", "/user2/repo59/blame/branch/master/deep")
 	MakeRequest(t, req, http.StatusNotFound)
+}
+
+func TestRepoFindFilesRequiresCodeRead(t *testing.T) {
+	defer tests.PrepareTestEnv(t)()
+
+	// user15 is on test_team (id=7), which has only issue access in org3. Give that team
+	// the private repo so the issues page is reachable and the code check is what fails.
+	unittest.AssertSuccessfulInsert(t, &organization.TeamRepo{OrgID: 3, TeamID: 7, RepoID: 3})
+	session := loginUser(t, "user15")
+
+	session.MakeRequest(t, NewRequest(t, "GET", "/org3/repo3/issues"), http.StatusOK)
+	session.MakeRequest(t, NewRequest(t, "GET", "/org3/repo3/find/branch/master"), http.StatusNotFound)
+	session.MakeRequest(t, NewRequest(t, "GET", "/org3/repo3/tree-list/branch/master"), http.StatusNotFound)
 }

@@ -6,6 +6,7 @@ package git
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"strings"
 )
@@ -31,6 +32,19 @@ func CommitFromReader(gitRepo *Repository, objectID ObjectID, reader io.Reader) 
 	if !ok {
 		bufReader = bufio.NewReader(reader)
 	}
+
+	// Git parses tree (1), parent (0-N), author (1), and committer (1) in that order.
+	// Headers outside that position must not populate those fields. A crafted commit
+	// can otherwise make Forgejo show a different tree or diff than git does.
+	// https://github.com/git/git/blob/fb255012acbcbe81189cb8014da0280b09c66ecc/fsck.c#L969-L999
+	type parseState int
+	const (
+		treeNext parseState = iota
+		parentOrAuthorNext
+		committerNext
+		otherNext
+	)
+	state := treeNext
 
 readLoop:
 	for {
@@ -68,31 +82,50 @@ readLoop:
 				data = split[1]
 			}
 
-			switch string(split[0]) {
-			case "tree":
-				commit.Tree = *NewTree(gitRepo, MustIDFromString(string(data)))
+			noun := string(split[0])
+			switch state {
+			case treeNext:
+				if noun == "tree" {
+					commit.Tree = *NewTree(gitRepo, MustIDFromString(string(data)))
+					state = parentOrAuthorNext
+				} else {
+					return nil, fmt.Errorf("CommitFromReader: expected tree, but received %q", noun)
+				}
 				_, _ = payloadSB.Write(line)
-			case "parent":
-				commit.Parents = append(commit.Parents, MustIDFromString(string(data)))
+			case parentOrAuthorNext:
+				switch noun {
+				case "parent":
+					commit.Parents = append(commit.Parents, MustIDFromString(string(data)))
+				case "author":
+					commit.Author = &Signature{}
+					commit.Author.Decode(data)
+					state = committerNext
+				default:
+					return nil, fmt.Errorf("CommitFromReader: expected parent or author, but received %q", noun)
+				}
 				_, _ = payloadSB.Write(line)
-			case "author":
-				commit.Author = &Signature{}
-				commit.Author.Decode(data)
+			case committerNext:
+				if noun == "committer" {
+					commit.Committer = &Signature{}
+					commit.Committer.Decode(data)
+					state = otherNext
+				} else {
+					return nil, fmt.Errorf("CommitFromReader: expected committer, but received %q", noun)
+				}
 				_, _ = payloadSB.Write(line)
-			case "committer":
-				commit.Committer = &Signature{}
-				commit.Committer.Decode(data)
-				_, _ = payloadSB.Write(line)
-			case "encoding":
-				_, _ = payloadSB.Write(line)
-			case "change-id": // jj-vcs specific header.
-				_, _ = payloadSB.Write(line)
-			case "gpgsig":
-				fallthrough
-			case "gpgsig-sha256": // FIXME: no intertop, so only 1 exists at present.
-				_, _ = signatureSB.Write(data)
-				_ = signatureSB.WriteByte('\n')
-				pgpsig = true
+			case otherNext:
+				switch noun {
+				case "gpgsig":
+					fallthrough
+				case "gpgsig-sha256": // FIXME: no intertop, so only 1 exists at present.
+					_, _ = signatureSB.Write(data)
+					_ = signatureSB.WriteByte('\n')
+					pgpsig = true
+				default:
+					// encoding, change-id, and any later tree/parent/author/committer
+					// stay in the payload and do not replace the positional headers.
+					_, _ = payloadSB.Write(line)
+				}
 			}
 		} else {
 			_, _ = messageSB.Write(line)

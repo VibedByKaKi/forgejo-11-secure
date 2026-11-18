@@ -166,7 +166,7 @@ func ReplaceInactivePrimaryEmail(ctx context.Context, oldEmail string, email *us
 		return err
 	}
 
-	err = MakeEmailAddressPrimary(ctx, user, email, false)
+	err = makeEmailAddressPrimary(ctx, user, email, false)
 	if err != nil {
 		return err
 	}
@@ -200,6 +200,13 @@ func DeleteEmailAddresses(ctx context.Context, u *user_model.User, emails []stri
 }
 
 func MakeEmailAddressPrimary(ctx context.Context, u *user_model.User, newPrimaryEmail *user_model.EmailAddress, notify bool) error {
+	if !newPrimaryEmail.IsActivated {
+		return validation.ErrEmailNotActivated
+	}
+	return makeEmailAddressPrimary(ctx, u, newPrimaryEmail, notify)
+}
+
+func makeEmailAddressPrimary(ctx context.Context, u *user_model.User, newPrimaryEmail *user_model.EmailAddress, notify bool) error {
 	ctx, committer, err := db.TxContext(ctx)
 	if err != nil {
 		return err
